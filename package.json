@@ -1,0 +1,9 @@
+{
+  "name": "mmm-comic-button",
+  "version": "1.0.0",
+  "description": "MagicMirror² touch button – AI comic generation via Claude + DALL-E 3 + Mastodon",
+  "main": "MMM-ComicButton.js",
+  "dependencies": {
+    "form-data": "^4.0.0"
+  }
+}
