@@ -1,6 +1,6 @@
 # MMM-ComicButton
 
-Ein MagicMirror²-Modul mit Touch-Button, das per Knopfdruck aus der aktuell angezeigten News-Headline automatisch einen **Comic im Stil von Martin Perscheid / MAD Magazin** generiert und direkt auf **Mastodon** postet.
+Ein MagicMirror²-Modul mit Touch-Button, das per Knopfdruck aus einer zufälligen News-Headline automatisch einen **Comic** generiert und direkt auf **Mastodon** postet. Der Comic-Stil wird bei jedem Tastendruck zufällig aus einer konfigurierbaren Liste gewählt.
 
 ---
 
@@ -10,23 +10,23 @@ Ein MagicMirror²-Modul mit Touch-Button, das per Knopfdruck aus der aktuell ang
 [Touch auf Button]
        │
        ▼
-Aktuelle Headline (von MMM-NewsComicFeed)
+Zufällige Headline aus dem Pool
+(gesammelt von allen MMM-NewsComicFeed-Instanzen)
        │
        ▼
-① Claude API
-  Erstellt einen kreativen DALL-E 3 Prompt
-  im Perscheid/MAD-Stil mit schwarzem Humor
+① Claude API (claude-sonnet-4)
+  Erstellt DALL-E 3 Prompt im gewählten Comic-Stil
        │
        ▼
 ② OpenAI DALL-E 3
-  Generiert das Comic-Bild (1024×1024)
+  Generiert das Comic-Bild (1792×1024)
        │
        ▼
 ③ Mastodon
   Bild + Headline-Caption als neuer Post
        │
        ▼
-✅ Fertig – Button reset nach 5 Sekunden
+✅ Button reset nach 5 Sekunden
 ```
 
 ---
@@ -34,8 +34,8 @@ Aktuelle Headline (von MMM-NewsComicFeed)
 ## Voraussetzungen
 
 - MagicMirror² v2.15 oder neuer
-- **MMM-NewsComicFeed** muss ebenfalls installiert sein (liefert die Headline)
-- API Keys für Anthropic, OpenAI und Mastodon (Details unten)
+- **MMM-NewsComicFeed** installiert und konfiguriert
+- API Keys für Anthropic, OpenAI und Mastodon
 
 ---
 
@@ -53,18 +53,15 @@ npm install
 ## API Keys einrichten
 
 ### Anthropic (Claude)
-1. [console.anthropic.com](https://console.anthropic.com/) → API Keys → Create Key
-2. Kosten: Claude Sonnet, ~$0.003 pro Aufruf
+[console.anthropic.com](https://console.anthropic.com/) → API Keys → Create Key
 
 ### OpenAI (DALL-E 3)
-1. [platform.openai.com/api-keys](https://platform.openai.com/api-keys) → Create new secret key
-2. Kosten: DALL-E 3 Standard 1024×1024 = **~$0.04 pro Bild**
+[platform.openai.com/api-keys](https://platform.openai.com/api-keys) → Create new secret key
 
 ### Mastodon Access Token
-1. Mastodon-Instanz öffnen → **Einstellungen → Entwickler → Neue Anwendung**
-2. Name: `MagicMirror Comic`
-3. Scopes: `write:media` und `write:statuses` aktivieren
-4. Speichern → **Ihr Zugriffstoken** kopieren
+Einstellungen → Entwickler → Neue Anwendung
+- Scopes: `write:media` und `write:statuses`
+- Instanz-URL ohne trailing slash, z.B. `https://mastodon.social`
 
 ---
 
@@ -73,44 +70,76 @@ npm install
 ```javascript
 {
   module:   "MMM-ComicButton",
-  position: "bottom_right",
+  position: "top_right",
   config: {
     anthropicKey:     "sk-ant-...",
     openaiKey:        "sk-...",
-    mastodonInstance: "https://mastodon.social",   // deine Instanz
+    mastodonInstance: "https://mastodon.social",
     mastodonToken:    "dein_access_token",
-    imageSize:        "1024x1024",
-    comicStyle:       "Martin Perscheid, MAD Magazin, black humor, sarcastic, exaggerated faces, newspaper comic strip panel, hand-drawn ink style",
+    imageSize:        "1792x1024",
+    comicStyles: [
+      "Martin Perscheid, MAD Magazin, black humor, sarcastic, exaggerated faces, newspaper comic strip panel, hand-drawn ink style",
+      "Charles Schulz, Peanuts style, clean lines, simple backgrounds, dry humor",
+      "Edward Gorey, dark humor, crosshatching, gothic, absurdist, black and white",
+      "Nebelspalter Magazin, Swiss political satire, editorial cartoon, sharp wit",
+      "manga style, exaggerated expressions, speed lines, satirical, Osamu Tezuka",
+    ],
   },
 },
 ```
 
-### Alle Optionen
+---
+
+## Alle Optionen
 
 | Option | Standard | Beschreibung |
 |---|---|---|
 | `anthropicKey` | – | Anthropic API Key (Pflicht) |
 | `openaiKey` | – | OpenAI API Key (Pflicht) |
-| `mastodonInstance` | – | URL deiner Mastodon-Instanz, z.B. `https://mastodon.social` (Pflicht) |
+| `mastodonInstance` | – | URL der Mastodon-Instanz (Pflicht) |
 | `mastodonToken` | – | Mastodon Access Token (Pflicht) |
-| `imageSize` | `"1024x1024"` | DALL-E Bildgrösse: `"1024x1024"`, `"1792x1024"`, `"1024x1792"` |
-| `comicStyle` | Perscheid/MAD | Freitext-Stilanweisung für Claude's Prompt-Generierung |
+| `imageSize` | `"1792x1024"` | DALL-E Bildgrösse – nur diese Werte erlaubt: `1024x1024`, `1792x1024`, `1024x1792` |
+| `comicStyles` | Perscheid/MAD | Array von Stil-Strings – bei jedem Press wird zufällig einer gewählt |
+
+### Gültige `imageSize`-Werte (DALL-E 3)
+
+| Wert | Format | Empfehlung |
+|---|---|---|
+| `1024x1024` | Quadrat | Einzelne Szene |
+| `1792x1024` | Querformat | Comic-Panel, Panorama ✅ |
+| `1024x1792` | Hochformat | Portrait, Cartoon-Figur |
+
+---
+
+## Bildgrösse auf dem Mirror anpassen
+
+Das angezeigte Bild kommt von **MMM-Mastodon**. Grösse via `custom.css` steuern:
+
+```css
+/* ~/MagicMirror/config/custom.css */
+.MMM-Mastodon img {
+  width: 400px !important;
+  height: auto !important;
+}
+```
+
+Der Selektor `.MMM-Mastodon img` funktioniert, weil MagicMirror den Modulnamen automatisch als CSS-Klasse auf den äusseren Container setzt.
 
 ---
 
 ## Zustände des Buttons
 
-| Zustand | Anzeige | Beschreibung |
-|---|---|---|
-| **idle** | 🎨 Comic generieren | Bereit – zeigt aktuelle Headline als Vorschau |
-| **idle (kein Feed)** | Ausgegraut | Noch keine Headline von MMM-NewsComicFeed empfangen |
-| **generating** | Spinner + Statustext | Pipeline läuft (ca. 10–20 Sekunden gesamt) |
-| **done** | ✅ Mastodon gepostet! | Erfolgreich – reset nach 5s |
-| **error** | ❌ Fehlermeldung | Fehler – reset nach 5s, dann erneut versuchen |
+| Zustand | Anzeige |
+|---|---|
+| **Bereit** | 🎨 Comic · letzte Headline als Vorschau |
+| **Kein Feed** | Ausgegraut (bis MMM-NewsComicFeed geladen ist) |
+| **Generiert** | Spinner + aktueller Schritt |
+| **Fertig** | ✅ Gepostet! (reset nach 5s) |
+| **Fehler** | ❌ Fehlermeldung (reset nach 5s) |
 
-### Statustexte während Generierung
+### Schritte während der Generierung
 
-1. `Erstelle Comic-Prompt via Claude…`
+1. `Erstelle Prompt…`
 2. `Generiere Bild mit DALL-E 3…`
 3. `Lade Bild herunter…`
 4. `Lade auf Mastodon hoch…`
@@ -118,69 +147,36 @@ npm install
 
 ---
 
-## Comic-Stil anpassen
+## Headline-Pool
 
-Der `comicStyle`-Parameter wird direkt in Claude's System-Prompt eingebettet. Beispiele für andere Stile:
+MMM-ComicButton sammelt automatisch die letzte Headline **jeder** Feed-Quelle aus allen laufenden MMM-NewsComicFeed-Instanzen. Beim Tastendruck wird zufällig eine Headline aus dem Pool gewählt – so kommen Schweizer News (TA, 20min) und Sport-News (TuttoJuve, Formel1) gleichmässig zum Zug.
 
-```javascript
-// Klassischer Zeitungscomic
-comicStyle: "Charles Schulz, Peanuts style, clean lines, simple backgrounds, dry humor"
-
-// Düster/Sarkastisch
-comicStyle: "Edward Gorey, dark humor, crosshatching, gothic, absurdist, black and white"
-
-// Schweizer Satire
-comicStyle: "Nebelspalter Magazin, Swiss political satire, editorial cartoon, sharp wit"
-
-// Manga-Satire
-comicStyle: "manga style, exaggerated expressions, speed lines, satirical, Osamu Tezuka"
-```
+Der Pool wird fortlaufend aktualisiert: Rotiert ein Ticker zur nächsten Headline, wird der Eintrag für diese Quelle im Pool ersetzt.
 
 ---
 
-## Zusammenspiel mit MMM-NewsComicFeed
+## Kosten pro Tastendruck
 
-MMM-ComicButton **empfängt** die Notification `NEWS_CURRENT_HEADLINE` von MMM-NewsComicFeed. Die zuletzt angezeigte Headline wird im Button als Vorschau eingeblendet und beim Tastendruck für die Generierung verwendet.
+| Dienst | Kosten |
+|---|---|
+| Claude Sonnet | ~$0.003 |
+| DALL-E 3 Standard 1792×1024 | ~$0.080 |
+| **Total** | **~$0.083** |
 
-Wird MMM-NewsComicFeed **nicht** verwendet, kann die Headline auch manuell per Notification gesetzt werden:
-
-```javascript
-// Zum Testen aus der Browser-Konsole:
-MM.sendNotification("NEWS_CURRENT_HEADLINE", {
-  title:  "Bundesrat erhöht Mehrwertsteuer auf 42%",
-  source: "Test",
-});
-```
+Bei 3 Comics täglich: ~$7.50/Monat.
 
 ---
 
 ## Fehlerbehebung
 
 **Button bleibt ausgegraut**
-→ MMM-NewsComicFeed läuft nicht oder hat noch keine Headline geladen. Kurz warten oder Feeds prüfen.
+→ MMM-NewsComicFeed noch nicht geladen. Button pollt alle 5s automatisch nach (bis zu 1 Min.).
 
-**Fehler: „Claude API: …"**
-→ Anthropic API Key prüfen. Evtl. Kontolimite überschritten.
+**`imageSize` Fehler**
+→ Nur `1024x1024`, `1792x1024` oder `1024x1792` sind für DALL-E 3 gültig.
 
-**Fehler: „DALL-E API: …"**
-→ OpenAI API Key prüfen. Saldo auf [platform.openai.com/usage](https://platform.openai.com/usage) kontrollieren.
-
-**Fehler: „Mastodon upload: …"**
-→ Token-Scopes prüfen (`write:media` und `write:statuses` müssen aktiviert sein). Instanz-URL ohne trailing slash angeben.
-
-**Bild wird generiert, aber nicht gepostet**
-→ `pm2 logs` für detaillierte Fehlermeldung. Häufig ein Problem mit der Mastodon-Instanz-URL (http vs. https).
-
----
-
-## Kosten-Schätzung
-
-Pro Tastendruck:
-- Claude Sonnet: ~$0.003
-- DALL-E 3 Standard: ~$0.040
-- **Total: ~$0.043 pro Comic**
-
-Bei 5 Comics täglich: ~$6.50/Monat.
+**Fehler: Claude / DALL-E / Mastodon**
+→ `pm2 logs` für Details. Häufigste Ursachen: ungültiger API Key, leeres OpenAI-Guthaben, falsche Mastodon-Scopes.
 
 ---
 
