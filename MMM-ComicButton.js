@@ -7,7 +7,6 @@ Module.register("MMM-ComicButton", {
     mastodonInstance: "https://YOUR.MASTODON.INSTANCE",
     mastodonToken:    "YOUR_MASTODON_ACCESS_TOKEN",
     imageSize:        "1792x1024",
-    // Array → zufälliger Stil bei jedem Tastendruck
     comicStyles: [
       "Martin Perscheid, MAD Magazin, black humor, sarcastic, exaggerated faces, newspaper comic strip panel, hand-drawn ink style",
       "Charles Schulz, Peanuts style, clean lines, simple backgrounds, dry humor",
@@ -18,32 +17,15 @@ Module.register("MMM-ComicButton", {
   },
 
   start() {
-    // Pool aus allen Feed-Instanzen
-    this.headlinePool = [];
-    this.state        = "idle";
-    this.statusMsg    = "";
-
-    let attempts = 0;
-    this._pollTimer = setInterval(() => {
-      if (this.headlinePool.length || ++attempts > 12) {
-        clearInterval(this._pollTimer);
-        return;
-      }
-      this.sendNotification("REQUEST_CURRENT_HEADLINE");
-    }, 5000);
+    this.selectedHeadline = null;
+    this.state            = "idle";
+    this.statusMsg        = "";
   },
 
   notificationReceived(notification, payload) {
-    if (notification === "NEWS_CURRENT_HEADLINE" && payload?.title) {
-      // Headline im Pool aktualisieren (pro Quelle nur eine, keine Duplikate)
-      const idx = this.headlinePool.findIndex(h => h.source === payload.source);
-      if (idx >= 0) {
-        this.headlinePool[idx] = payload;
-      } else {
-        this.headlinePool.push(payload);
-      }
-      clearInterval(this._pollTimer);
-      this.updateDom(300);
+    if (notification === "COMIC_HEADLINE_SELECTED") {
+      this.selectedHeadline = payload;
+      this.updateDom(250);
     }
   },
 
@@ -55,8 +37,9 @@ Module.register("MMM-ComicButton", {
 
       if (this.state === "done" || this.state === "error") {
         setTimeout(() => {
-          this.state     = "idle";
-          this.statusMsg = "";
+          this.state            = "idle";
+          this.statusMsg        = "";
+          this.selectedHeadline = null; // reset nach Post
           this.updateDom(300);
         }, 5000);
       }
@@ -67,6 +50,7 @@ Module.register("MMM-ComicButton", {
     const w = document.createElement("div");
     w.className = "comic-btn-wrap";
 
+    // ── Generating ──────────────────────────────────────────
     if (this.state === "generating") {
       w.innerHTML = `
         <div class="comic-btn-active">
@@ -76,48 +60,60 @@ Module.register("MMM-ComicButton", {
       return w;
     }
 
+    // ── Done ────────────────────────────────────────────────
     if (this.state === "done") {
       w.innerHTML = `<div class="comic-btn-active comic-state-done">✅ Gepostet!</div>`;
       return w;
     }
 
+    // ── Error ───────────────────────────────────────────────
     if (this.state === "error") {
       w.innerHTML = `<div class="comic-btn-active comic-state-error">❌ ${this.statusMsg}</div>`;
       return w;
     }
 
-    const ready = this.headlinePool.length > 0;
-    const preview = ready
-      ? this._truncate(this.headlinePool[this.headlinePool.length - 1].title, 48)
-      : "–";
+    // ── Idle: Headline ausgewählt ────────────────────────────
+    if (this.selectedHeadline) {
+      const btn = document.createElement("div");
+      btn.className = "comic-btn comic-btn-ready";
+      btn.innerHTML = `
+        <span class="comic-btn-icon">🎨</span>
+        <div class="comic-btn-content">
+          <span class="comic-btn-label">Jetzt generieren</span>
+          <span class="comic-btn-headline">${this._truncate(this.selectedHeadline.title, 52)}</span>
+          <span class="comic-btn-source">${this.selectedHeadline.source}</span>
+        </div>
+        <span class="comic-btn-arrow">▶</span>
+      `;
+      btn.addEventListener("click", () => this._onPress());
+      w.appendChild(btn);
+      return w;
+    }
 
-    const btn = document.createElement("div");
-    btn.className = "comic-btn" + (ready ? "" : " comic-btn-disabled");
-    btn.innerHTML = `
-      <span class="comic-btn-icon">🎨</span>
-      <span class="comic-btn-label">Comic</span>
-      <span class="comic-btn-sub">${preview}</span>`;
-
-    if (ready) btn.addEventListener("click", () => this._onPress());
-    w.appendChild(btn);
+    // ── Idle: Keine Headline ausgewählt ─────────────────────
+    w.innerHTML = `
+      <div class="comic-btn comic-btn-waiting">
+        <span class="comic-btn-icon">🎨</span>
+        <div class="comic-btn-content">
+          <span class="comic-btn-label">Comic</span>
+          <span class="comic-btn-sub">Headline antippen zum Auswählen</span>
+        </div>
+      </div>`;
     return w;
   },
 
   _onPress() {
-    if (!this.headlinePool.length || this.state === "generating") return;
+    if (!this.selectedHeadline || this.state === "generating") return;
 
-    // Zufällige Headline aus dem Pool
-    const headline = this.headlinePool[Math.floor(Math.random() * this.headlinePool.length)];
-    // Zufälliger Comic-Stil
-    const styles   = this.config.comicStyles;
-    const style    = styles[Math.floor(Math.random() * styles.length)];
+    const styles = this.config.comicStyles;
+    const style  = styles[Math.floor(Math.random() * styles.length)];
 
     this.state     = "generating";
     this.statusMsg = "Erstelle Prompt…";
     this.updateDom(200);
 
     this.sendSocketNotification("COMIC_GENERATE", {
-      headline,
+      headline:         this.selectedHeadline,
       comicStyle:       style,
       anthropicKey:     this.config.anthropicKey,
       openaiKey:        this.config.openaiKey,

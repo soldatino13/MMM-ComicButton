@@ -1,32 +1,39 @@
 # MMM-ComicButton
 
-Ein MagicMirror²-Modul mit Touch-Button, das per Knopfdruck aus einer zufälligen News-Headline automatisch einen **Comic** generiert und direkt auf **Mastodon** postet. Der Comic-Stil wird bei jedem Tastendruck zufällig aus einer konfigurierbaren Liste gewählt.
+Ein MagicMirror²-Touch-Button, der aus einer **bewusst ausgewählten** News-Headline per KI einen Comic generiert und auf Mastodon postet. Der Comic-Stil wird bei jedem Tastendruck zufällig aus einer konfigurierbaren Liste gewählt.
 
 ---
 
-## Ablauf
+## Flow
 
 ```
-[Touch auf Button]
-       │
-       ▼
-Zufällige Headline aus dem Pool
-(gesammelt von allen MMM-NewsComicFeed-Instanzen)
-       │
-       ▼
-① Claude API (claude-sonnet-4)
-  Erstellt DALL-E 3 Prompt im gewählten Comic-Stil
-       │
-       ▼
-② OpenAI DALL-E 3
-  Generiert das Comic-Bild (1792×1024)
-       │
-       ▼
-③ Mastodon
-  Bild + Headline-Caption als neuer Post
-       │
-       ▼
-✅ Button reset nach 5 Sekunden
+① Headline im Ticker antippen (MMM-NewsComicFeed)
+         │
+         ▼
+② Button leuchtet gold auf
+   zeigt Headline + Quelle
+         │
+         ▼
+③ Button antippen → Generierung startet
+         │
+   ┌─────┴──────────────────────────────┐
+   │  Claude API                        │
+   │  Erstellt DALL-E Prompt            │
+   │  im zufälligen Comic-Stil          │
+   └─────┬──────────────────────────────┘
+         │
+   ┌─────┴──────────────────────────────┐
+   │  OpenAI DALL-E 3                   │
+   │  Generiert Bild (1792×1024)        │
+   └─────┬──────────────────────────────┘
+         │
+   ┌─────┴──────────────────────────────┐
+   │  Mastodon                          │
+   │  Bild + Headline-Caption als Post  │
+   └─────┬──────────────────────────────┘
+         │
+         ▼
+④ ✅ Gepostet! – alles reset nach 5s
 ```
 
 ---
@@ -96,18 +103,38 @@ Einstellungen → Entwickler → Neue Anwendung
 |---|---|---|
 | `anthropicKey` | – | Anthropic API Key (Pflicht) |
 | `openaiKey` | – | OpenAI API Key (Pflicht) |
-| `mastodonInstance` | – | URL der Mastodon-Instanz (Pflicht) |
-| `mastodonToken` | – | Mastodon Access Token (Pflicht) |
-| `imageSize` | `"1792x1024"` | DALL-E Bildgrösse – nur diese Werte erlaubt: `1024x1024`, `1792x1024`, `1024x1792` |
-| `comicStyles` | Perscheid/MAD | Array von Stil-Strings – bei jedem Press wird zufällig einer gewählt |
+| `mastodonInstance` | – | URL der Mastodon-Instanz ohne trailing slash (Pflicht) |
+| `mastodonToken` | – | Mastodon Access Token mit `write:media` + `write:statuses` (Pflicht) |
+| `imageSize` | `"1792x1024"` | DALL-E Bildgrösse – siehe Tabelle unten |
+| `comicStyles` | Perscheid/MAD | Array von Stil-Strings – zufällig gewählt pro Tastendruck |
 
 ### Gültige `imageSize`-Werte (DALL-E 3)
 
 | Wert | Format | Empfehlung |
 |---|---|---|
 | `1024x1024` | Quadrat | Einzelne Szene |
-| `1792x1024` | Querformat | Comic-Panel, Panorama ✅ |
+| `1792x1024` | Querformat | Comic-Panel ✅ |
 | `1024x1792` | Hochformat | Portrait, Cartoon-Figur |
+
+---
+
+## Button-Zustände
+
+| Zustand | Aussehen | Beschreibung |
+|---|---|---|
+| **Wartend** | Ausgegraut, dezent | Noch keine Headline ausgewählt |
+| **Bereit** | Gold, klickbar + ▶ | Headline ausgewählt, bereit zum Generieren |
+| **Generiert** | Spinner + Schritt | Pipeline läuft (~15–25 Sek.) |
+| **Fertig** | ✅ Gepostet! | Erfolgreich – reset nach 5s |
+| **Fehler** | ❌ Fehlermeldung | Fehler – reset nach 5s |
+
+### Generierungsschritte
+
+1. `Erstelle Prompt…`
+2. `Generiere Bild mit DALL-E 3…`
+3. `Lade Bild herunter…`
+4. `Lade auf Mastodon hoch…`
+5. `Erstelle Mastodon-Post…`
 
 ---
 
@@ -123,35 +150,35 @@ Das angezeigte Bild kommt von **MMM-Mastodon**. Grösse via `custom.css` steuern
 }
 ```
 
-Der Selektor `.MMM-Mastodon img` funktioniert, weil MagicMirror den Modulnamen automatisch als CSS-Klasse auf den äusseren Container setzt.
+---
+
+## Comic-Stile anpassen
+
+Eigene Stile einfach zum Array hinzufügen:
+
+```javascript
+comicStyles: [
+  // Bestehende Stile...
+
+  // Eigene Ergänzungen:
+  "Gary Larson, Far Side style, single panel, absurd humor, animals and scientists",
+  "Ralph Steadman, gonzo illustration, splattered ink, chaotic energy, Hunter S. Thompson",
+  "Quino, Mafalda style, Argentine political humor, simple lines, social commentary",
+],
+```
 
 ---
 
-## Zustände des Buttons
+## Notification-Schnittstelle
 
-| Zustand | Anzeige |
-|---|---|
-| **Bereit** | 🎨 Comic · letzte Headline als Vorschau |
-| **Kein Feed** | Ausgegraut (bis MMM-NewsComicFeed geladen ist) |
-| **Generiert** | Spinner + aktueller Schritt |
-| **Fertig** | ✅ Gepostet! (reset nach 5s) |
-| **Fehler** | ❌ Fehlermeldung (reset nach 5s) |
+### Empfängt
 
-### Schritte während der Generierung
+```javascript
+// Von MMM-NewsComicFeed beim Antippen einer Headline:
+"COMIC_HEADLINE_SELECTED" → { source, category, title, link, pubDate }
+```
 
-1. `Erstelle Prompt…`
-2. `Generiere Bild mit DALL-E 3…`
-3. `Lade Bild herunter…`
-4. `Lade auf Mastodon hoch…`
-5. `Erstelle Mastodon-Post…`
-
----
-
-## Headline-Pool
-
-MMM-ComicButton sammelt automatisch die letzte Headline **jeder** Feed-Quelle aus allen laufenden MMM-NewsComicFeed-Instanzen. Beim Tastendruck wird zufällig eine Headline aus dem Pool gewählt – so kommen Schweizer News (TA, 20min) und Sport-News (TuttoJuve, Formel1) gleichmässig zum Zug.
-
-Der Pool wird fortlaufend aktualisiert: Rotiert ein Ticker zur nächsten Headline, wird der Eintrag für diese Quelle im Pool ersetzt.
+Nach Erhalt dieser Notification wechselt der Button in den **Bereit**-Zustand und zeigt die Headline an.
 
 ---
 
@@ -163,20 +190,21 @@ Der Pool wird fortlaufend aktualisiert: Rotiert ein Ticker zur nächsten Headlin
 | DALL-E 3 Standard 1792×1024 | ~$0.080 |
 | **Total** | **~$0.083** |
 
-Bei 3 Comics täglich: ~$7.50/Monat.
-
 ---
 
 ## Fehlerbehebung
 
 **Button bleibt ausgegraut**
-→ MMM-NewsComicFeed noch nicht geladen. Button pollt alle 5s automatisch nach (bis zu 1 Min.).
+→ Noch keine Headline angetippt. Headline im oberen oder unteren Ticker antippen.
 
-**`imageSize` Fehler**
+**`imageSize` Fehler in den Logs**
 → Nur `1024x1024`, `1792x1024` oder `1024x1792` sind für DALL-E 3 gültig.
 
 **Fehler: Claude / DALL-E / Mastodon**
-→ `pm2 logs` für Details. Häufigste Ursachen: ungültiger API Key, leeres OpenAI-Guthaben, falsche Mastodon-Scopes.
+→ `pm2 logs` für Details. Häufigste Ursachen:
+- Ungültiger oder abgelaufener API Key
+- Leeres OpenAI-Guthaben → [platform.openai.com/usage](https://platform.openai.com/usage)
+- Mastodon Token ohne `write:media` oder `write:statuses` Scope
 
 ---
 
