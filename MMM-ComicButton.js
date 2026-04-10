@@ -8,11 +8,28 @@ Module.register("MMM-ComicButton", {
     mastodonToken:    "YOUR_MASTODON_ACCESS_TOKEN",
     imageSize:        "1792x1024",
     comicStyles: [
-      "Martin Perscheid, MAD Magazin, black humor, sarcastic, exaggerated faces, newspaper comic strip panel, hand-drawn ink style",
-      "Charles Schulz, Peanuts style, clean lines, simple backgrounds, dry humor",
-      "Edward Gorey, dark humor, crosshatching, gothic, absurdist, black and white",
-      "Nebelspalter Magazin, Swiss political satire, editorial cartoon, sharp wit",
-      "manga style, exaggerated expressions, speed lines, satirical, Osamu Tezuka",
+      // Deutsch/Schweizer Satire
+      "Martin Perscheid style, MAD Magazin Germany, black humor, sarcastic caricature, exaggerated ugly faces, newspaper comic strip panel, dense crosshatching, hand-drawn ink",
+      "Nebelspalter Magazin Swiss satire, editorial cartoon, sharp political wit, clean ink lines, Swiss German humor, black and white",
+      "Wilhelm Busch style, classic German comic, Max und Moritz aesthetic, bold outlines, mischievous humor, vintage 19th century illustration",
+      "F.K. Waechter style, German children book satire, absurdist humor, loose ink lines, whimsical characters",
+
+      // US Klassiker
+      "Gary Larson Far Side style, single panel newspaper comic, absurd rural humor, thick outlines, plain backgrounds, scientists and animals",
+      "Charles Schulz Peanuts style, simple clean lines, minimal backgrounds, dry existential humor, round heads, 1960s newspaper strip",
+      "Bill Watterson Calvin and Hobbes style, expressive watercolor, dynamic action, philosophical humor, lush backgrounds",
+      "MAD Magazine USA style, manic detailed illustration, chaotic panel, caricature of real events, Mort Drucker influenced",
+
+      // Düster / Experimentell
+      "Edward Gorey style, dark crosshatching, gothic absurdist, fur coats and urns, deadpan black humor, Victorian aesthetic, black and white",
+      "Ralph Steadman gonzo illustration, splattered ink, chaotic energy, distorted faces, Hunter S. Thompson aesthetic, raw expressionism",
+      "Robert Crumb underground comix style, dense stippling, counter-culture, grotesque exaggeration, 1970s underground press",
+
+      // International
+      "Quino Mafalda style, Argentine political cartoon, simple clean lines, sharp social commentary, expressive children characters",
+      "Hergé Tintin ligne claire style, clean precise outlines, flat colors, no shadows, Belgian comic tradition, detailed backgrounds",
+      "Mordillo style, wordless gag cartoon, round cute characters, pastel colors, absurd surreal situations, gentle humor",
+      "manga satire style, Osamu Tezuka influenced, exaggerated sweat drops and shock lines, speed lines, satirical commentary",
     ],
   },
 
@@ -105,8 +122,12 @@ Module.register("MMM-ComicButton", {
   _onPress() {
     if (!this.selectedHeadline || this.state === "generating") return;
 
-    const styles = this.config.comicStyles;
-    const style  = styles[Math.floor(Math.random() * styles.length)];
+    const styles = this.config.comicStyles?.length
+      ? this.config.comicStyles
+      : [this.config.comicStyle || "MAD Magazin style, black humor, exaggerated caricature"];
+    const idx   = Math.floor(Math.random() * styles.length);
+    const style = styles[idx];
+    console.log(`[MMM-ComicButton] Style #${idx}: ${style.slice(0, 60)}…`);
 
     this.state     = "generating";
     this.statusMsg = "Erstelle Prompt…";

@@ -152,20 +152,45 @@ Das angezeigte Bild kommt von **MMM-Mastodon**. Grösse via `custom.css` steuern
 
 ---
 
-## Comic-Stile anpassen
+## Comic-Stile
 
-Eigene Stile einfach zum Array hinzufügen:
+15 Stile sind vorinstalliert und werden bei jedem Tastendruck zufällig gewählt. Der gewählte Stil wird in `pm2 logs` geloggt.
+
+### Vorinstallierte Stile
+
+| Kategorie | Stil |
+|---|---|
+| **DE/CH Satire** | Martin Perscheid / MAD Deutschland |
+| | Nebelspalter Magazin |
+| | Wilhelm Busch (Max und Moritz) |
+| | F.K. Waechter |
+| **US Klassiker** | Gary Larson (Far Side) |
+| | Charles Schulz (Peanuts) |
+| | Bill Watterson (Calvin & Hobbes) |
+| | MAD Magazine USA |
+| **Düster/Experimentell** | Edward Gorey |
+| | Ralph Steadman (Gonzo) |
+| | Robert Crumb (Underground Comix) |
+| **International** | Quino (Mafalda) |
+| | Hergé (Tintin / Ligne Claire) |
+| | Mordillo (wordless gag cartoon) |
+| | Manga / Osamu Tezuka |
+
+### Eigene Stile ergänzen
+
+Einfach weitere Einträge zum Array hinzufügen:
 
 ```javascript
 comicStyles: [
-  // Bestehende Stile...
+  // ... bestehende Stile ...
 
-  // Eigene Ergänzungen:
-  "Gary Larson, Far Side style, single panel, absurd humor, animals and scientists",
-  "Ralph Steadman, gonzo illustration, splattered ink, chaotic energy, Hunter S. Thompson",
-  "Quino, Mafalda style, Argentine political humor, simple lines, social commentary",
+  // Eigene:
+  "Jack Davis MAD Magazine style, 1950s horror parody, loose ink, wild expressions",
+  "Sempé style, French gentle humor, delicate fine lines, Parisian scenes",
 ],
 ```
+
+Der Stil wird als direkter Bestandteil des DALL-E Prompts verwendet – je konkreter, desto besser das Ergebnis.
 
 ---
 
