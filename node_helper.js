@@ -27,14 +27,10 @@ module.exports = NodeHelper.create({
       const dallePrompt = await this._buildDallePrompt(headline, comicStyle, anthropicKey);
       console.log("[MMM-ComicButton] DALL-E prompt:", dallePrompt);
 
-      // 2. Generate image via DALL-E 3
-      this._status("Generiere Bild mit DALL-E 3…");
-      const imageUrl = await this._generateImage(dallePrompt, imageSize, openaiKey);
-
-      // 3. Download image to temp file
-      this._status("Lade Bild herunter…");
+      // 2. Generate image via gpt-image-1 (returns base64)
+      this._status("Generiere Bild…");
       const tmpFile = path.join(os.tmpdir(), `comic_${Date.now()}.png`);
-      await this._downloadFile(imageUrl, tmpFile);
+      await this._generateImage(dallePrompt, imageSize, openaiKey, tmpFile);
 
       // 4. Upload to Mastodon as media
       this._status("Lade auf Mastodon hoch…");
@@ -42,7 +38,7 @@ module.exports = NodeHelper.create({
 
       // 5. Post status with headline caption
       this._status("Erstelle Mastodon-Post…");
-      const caption = `🎨 ${headline.title}\n\n📰 ${headline.source}\n\n#MagicMirror #Comic #Satire`;
+      const caption = `${headline.title}\n\nQuelle: ${headline.source}\n\nKI-generiertes Bild (gpt-image-1.5 via OpenAI, Prompt via Claude)\n\n#MagicMirror #Comic #Satire #AIGenerated`;
       await this._mastodonPost(caption, mediaId, mastodonInstance, mastodonToken);
 
       // Cleanup
@@ -50,7 +46,6 @@ module.exports = NodeHelper.create({
 
       this.sendSocketNotification("COMIC_STATUS", {
         state:    "done",
-        imageUrl: imageUrl,
         message:  "Erfolgreich auf Mastodon gepostet!",
       });
 
@@ -93,14 +88,14 @@ Regeln:
     return parsed.content?.[0]?.text?.trim() ?? "";
   },
 
-  // ── Step 2: DALL-E 3 image generation ────────────────────
-  async _generateImage(prompt, size, apiKey) {
+  // ── Step 2: gpt-image-1 – gibt base64 zurück, direkt speichern ──
+  async _generateImage(prompt, size, apiKey, destFile) {
     const body = JSON.stringify({
-      model:   "dall-e-3",
-      prompt:  prompt,
-      size:    size,
-      quality: "standard",
-      n:       1,
+      model:           "gpt-image-1.5",
+      prompt:          prompt,
+      size:            size,
+      quality:         "medium",
+      n:               1,
     });
 
     const data = await this._apiPost("https://api.openai.com/v1/images/generations", body, {
@@ -109,27 +104,13 @@ Regeln:
     });
 
     const parsed = JSON.parse(data);
-    if (parsed.error) throw new Error("DALL-E API: " + parsed.error.message);
-    const url = parsed.data?.[0]?.url;
-    if (!url) throw new Error("DALL-E: Kein Bild-URL in Antwort");
-    return url;
-  },
+    if (parsed.error) throw new Error("OpenAI API: " + parsed.error.message);
+    const b64 = parsed.data?.[0]?.b64_json;
+    if (!b64) throw new Error("OpenAI: Kein Bild in Antwort (b64_json leer)");
 
-  // ── Step 3: Download image ────────────────────────────────
-  _downloadFile(url, dest) {
-    return new Promise((resolve, reject) => {
-      const lib = url.startsWith("https") ? https : http;
-      const file = fs.createWriteStream(dest);
-      lib.get(url, (res) => {
-        if (res.statusCode === 301 || res.statusCode === 302) {
-          file.close();
-          return this._downloadFile(res.headers.location, dest).then(resolve).catch(reject);
-        }
-        res.pipe(file);
-        file.on("finish", () => file.close(resolve));
-        file.on("error", reject);
-      }).on("error", reject);
-    });
+    // Base64 → Datei schreiben (kein separater Download nötig)
+    fs.writeFileSync(destFile, Buffer.from(b64, "base64"));
+    console.log("[MMM-ComicButton] Bild gespeichert:", destFile);
   },
 
   // ── Step 4: Upload image to Mastodon ─────────────────────
